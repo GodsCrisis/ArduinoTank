@@ -41,8 +41,8 @@ void loop() {
   //delay(50);
   digitalWrite(LED_BUILTIN, LOW);
   enc_clk_val = digitalRead(ENCODER_CLK);
-  enc_dt_val = digitalRead(ENCODER_DT);
   if (enc_clk_val != enc_clk_last) {
+    enc_dt_val = digitalRead(ENCODER_DT);
     if (enc_dt_val != enc_clk_val) {
       enc_pos ++;
       is_clockwise = true;
@@ -52,14 +52,15 @@ void loop() {
     }
     char out_text[32] = "\0";
     if (is_clockwise) {
-      sprintf(out_text, "cw");
+      //sprintf(out_text, "cw");
     } else {
-      sprintf(out_text, "ccw");
+      //sprintf(out_text, "ccw");
     }
-    sprintf(out_text, "%s %d",out_text,enc_pos);
+    //sprintf(out_text, "%s %d",out_text,enc_pos);
+    sprintf(out_text,"%08X",enc_pos);
     if(digitalRead(ENCODER_SW) != HIGH)
     {
-      sprintf(out_text, "%s klik", out_text);
+      //sprintf(out_text, "%s klik", out_text);
     }
     out_text[32] = '\0';
     radio.write(&out_text, sizeof(out_text));

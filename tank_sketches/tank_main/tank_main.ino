@@ -3,9 +3,14 @@
 #include <RF24.h>
 #include <printf.h>
 #include <stdint.h>
+#include <Servo.h>
+
+// Piny
+#define SERVO_PWM 9
 
 // CE = D7, CSN = D8 (dowolne piny cyfrowe)
 RF24 radio(7, 8);
+Servo servo;
 
 void setup()
 {
@@ -25,15 +30,9 @@ void setup()
   /*RADIO END*/
 
   /*MOTORS START*/
-  // ENABLE1  - pin D3
-  // INPUT1   - pin D4
-  // INPUT2   - pin D5
-
-  uint8_t in1 = 0;
-  uint8_t in2 = 255;
-  //digitalWrite(3,0);
-  //digitalWrite(4,in1);
-  //digitalWrite(5,in2);
+  pinMode(SERVO_PWM, OUTPUT);
+  servo.attach(SERVO_PWM);
+  /*MOTORS END*/
 }
 
 void loop()
@@ -42,7 +41,9 @@ void loop()
   {
     char buf[32];
     radio.read(&buf, 32);
-    printf("otrzymano: %s\n", buf);
+    int servo_dt = (int)strtol(buf, NULL, 16);
+    //printf("otrzymano: %s\n", buf);
+    servo.write(servo_dt);
     radio.flush_rx(); // Opróżnienie bufora odbiorczego
   }
   delay(10);
