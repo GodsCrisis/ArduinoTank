@@ -6,67 +6,74 @@
 #define ENCODER_CLK 8
 #define ENCODER_DT  9
 #define ENCODER_SW  10
+#define POT_SLIDE 26
+#define POT_ROT   27
 
-// CE = GP15, CSN = GP5
+struct __attribute__((packed)) radio_payload_t {
+  uint8_t  pos;    // 0…255
+  uint16_t slide;  // 0…1023
+  uint16_t rot;    // 0…1023
+  uint8_t  sw;     // 0 or 1
+};
+
 RF24 radio(15, 5);
 const byte address[] = "1Tank";
-int enc_pos = 0;
-int enc_clk_last;
-int enc_clk_val;
-int enc_dt_val;
-boolean is_clockwise;
+
+volatile int32_t enc_pos = 128; //0x00 - 0x80 - 0xFF
+volatile uint32_t last_interrupt = 0;
+const uint32_t DEBOUNCE_US = 200;  //czestotliwosc interrupt (200 µs)
+
+void handleEncoder() {
+  uint32_t now = micros();
+  if (now - last_interrupt < DEBOUNCE_US) return;
+  last_interrupt = now;
+
+  bool dt = digitalRead(ENCODER_DT);
+  if (dt != digitalRead(ENCODER_CLK)) {
+    enc_pos++;
+    if(enc_pos > 255) enc_pos = 255;
+  } else {
+    enc_pos--;
+    if(enc_pos < 0) enc_pos = 0;
+  }
+}
 
 void setup() {
-  //while (!Serial); // Czekaj na Serial
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(ENCODER_CLK, INPUT);
-  pinMode(ENCODER_DT, INPUT);
-  pinMode(ENCODER_SW, INPUT);
-  // Ustawienie SPI na niestandardowych pinach
-  SPI.setSCK(6);    // SCK -> GP6
-  SPI.setMOSI(7);   // MOSI -> GP7
-  SPI.setMISO(4);   // MISO -> GP4
-  radio.begin();
+  pinMode(ENCODER_CLK, INPUT_PULLUP);
+  pinMode(ENCODER_DT,  INPUT_PULLUP);
+  pinMode(ENCODER_SW,  INPUT_PULLUP);
 
+  attachInterrupt(ENCODER_CLK, handleEncoder, CHANGE);
+  // attachInterrupt(ENCODER_DT, handleEncoder, CHANGE);
+
+  pinMode(POT_SLIDE, INPUT);
+  pinMode(POT_ROT,   INPUT);
+
+  SPI.setSCK(6);
+  SPI.setMOSI(7);
+  SPI.setMISO(4);
+
+  radio.begin();
   radio.setChannel(76);
-  radio.setPALevel(RF24_PA_LOW);       // Zmienione na LOW dla stabilności
+  radio.setPALevel(RF24_PA_LOW);
   radio.setDataRate(RF24_250KBPS);
   radio.openWritingPipe(address);
-  radio.stopListening();               // Tryb nadawania
-  //radio.printDetails();
-  enc_clk_last = digitalRead(ENCODER_CLK);
+  radio.stopListening();
 }
 
 void loop() {
-  //delay(50);
-  digitalWrite(LED_BUILTIN, LOW);
-  enc_clk_val = digitalRead(ENCODER_CLK);
-  if (enc_clk_val != enc_clk_last) {
-    enc_dt_val = digitalRead(ENCODER_DT);
-    if (enc_dt_val != enc_clk_val) {
-      enc_pos ++;
-      is_clockwise = true;
-    } else {
-      is_clockwise = false;
-      enc_pos--;
-    }
-    char out_text[32] = "\0";
-    if (is_clockwise) {
-      //sprintf(out_text, "cw");
-    } else {
-      //sprintf(out_text, "ccw");
-    }
-    //sprintf(out_text, "%s %d",out_text,enc_pos);
-    sprintf(out_text,"%08X",enc_pos);
-    if(digitalRead(ENCODER_SW) != HIGH)
-    {
-      //sprintf(out_text, "%s klik", out_text);
-    }
-    out_text[32] = '\0';
-    radio.write(&out_text, sizeof(out_text));
-    digitalWrite(LED_BUILTIN, HIGH);
-  }
+  noInterrupts();
+  uint8_t pos = (uint8_t)enc_pos;
+  interrupts();
+
+  uint16_t slide = analogRead(POT_SLIDE);   //0x0000 - 0x03FF
+  uint16_t rot   = analogRead(POT_ROT);     //0x0000 - 0x03FF
+  bool     sw    = !digitalRead(ENCODER_SW);//0 - 1
+
+  radio_payload_t payload{pos,slide,rot,sw};
+
+  radio.write(&payload, sizeof(payload));
   radio.flush_tx();
-  enc_clk_last = enc_clk_val;
-  //delay(50); 
+
+  delay(10);
 }
