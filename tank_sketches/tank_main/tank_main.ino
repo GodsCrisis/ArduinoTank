@@ -7,6 +7,13 @@
 
 // Piny
 #define SERVO_PWM 9
+#define MOTOR_A_L 2
+#define MOTOR_A_R 4
+#define MOTOR_A_PWM 3
+#define MOTOR_B_L 12
+#define MOTOR_B_R 13
+#define MOTOR_B_PWM 11
+// #define DFPLAYER_IO1 13
 
 struct __attribute__((packed)) radio_payload_t {
   uint8_t  pos;    // 0…255
@@ -22,7 +29,7 @@ Servo servo;
 void setup()
 {
   Serial.begin(9600);
-  while (!Serial);  // Czekaj na otwarcie monitora szeregowego
+  //while (!Serial);  // Czekaj na otwarcie monitora szeregowego
   printf_begin();   // Inicjalizacja printf dla nrf24
   
   /*RADIO START*/
@@ -38,8 +45,14 @@ void setup()
 
   /*MOTORS START*/
   pinMode(SERVO_PWM, OUTPUT);
-  //servo.attach(SERVO_PWM);
+  servo.attach(SERVO_PWM);
+  servo.write(90);
+  digitalWrite(4,HIGH);
+  //digitalWrite(2,LOW);
   /*MOTORS END*/
+
+  /*DFPLAYER*/
+  //digitalWrite(DFPLAYER_IO1,LOW);
 }
 
 void loop()
@@ -51,6 +64,27 @@ void loop()
     printf("pos=%u  slide=%u  rot=%u  btn=%u\n",
                 payload.pos, payload.slide, payload.rot, payload.sw);
     radio.flush_rx(); // Opróżnienie bufora odbiorczego
+    servo.write(map(payload.pos,96,160,0,180));
+    int mapped_slider = map(payload.slide,0,1023,-255,255);
+    int mapped_rot = map(payload.rot,0,1023,-127,127);
+    if(mapped_slider >= 0)
+    {
+      analogWrite(MOTOR_A_PWM,min(mapped_slider - mapped_rot,255));
+      analogWrite(MOTOR_B_PWM,min(mapped_slider + mapped_rot,255));
+      digitalWrite(MOTOR_A_L,HIGH);
+      digitalWrite(MOTOR_A_R,LOW);
+      digitalWrite(MOTOR_B_L,HIGH);
+      digitalWrite(MOTOR_B_R,LOW);
+    }
+    else
+    {
+      analogWrite(MOTOR_A_PWM,min(-mapped_slider - mapped_rot,255));
+      analogWrite(MOTOR_B_PWM,min(-mapped_slider + mapped_rot,255));
+      digitalWrite(MOTOR_A_R,HIGH);
+      digitalWrite(MOTOR_A_L,LOW);
+      digitalWrite(MOTOR_B_R,HIGH);
+      digitalWrite(MOTOR_B_L,LOW);
+    }
   }
   delay(10);
 }
