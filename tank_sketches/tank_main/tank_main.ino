@@ -131,24 +131,36 @@ void loop() {
     servo.write(map(payload.pos, 96, 160, 0, 180));
 
     // Silniki
-    int mapped_slider = map(payload.slide, 0, 1023, -255, 255);
-    int mapped_rot = map(payload.rot, 0, 1023, -127, 127);
+    int mapped_slider_int = map(payload.slide, 0, 1023, -100, 100);
+    int mapped_rot_int = map(payload.rot, 0, 1023, -100, 100);
+    float mapped_slider = (float)mapped_slider_int/100.0f;
+    float mapped_rot = (float)mapped_rot_int/100.0f;
+    float kl = 255*(mapped_slider*(1-fabsf(mapped_rot))+mapped_slider*mapped_rot);
+    float kr = 255*(mapped_slider*(1-fabsf(mapped_rot))-mapped_slider*mapped_rot);
 
-    if (mapped_slider >= 0) {
-      analogWrite(MOTOR_A_PWM, min(mapped_slider - mapped_rot, 255));
-      analogWrite(MOTOR_B_PWM, min(mapped_slider + mapped_rot, 255));
+    if (kl >= 0) {
       digitalWrite(MOTOR_A_L, HIGH);
       digitalWrite(MOTOR_A_R, LOW);
+      
+    }
+    else
+    {
+      digitalWrite(MOTOR_A_L, LOW);
+      digitalWrite(MOTOR_A_R, HIGH);
+    }
+    if (kr >= 0) {
       digitalWrite(MOTOR_B_L, HIGH);
       digitalWrite(MOTOR_B_R, LOW);
-    } else {
-      analogWrite(MOTOR_A_PWM, min(-mapped_slider - mapped_rot, 255));
-      analogWrite(MOTOR_B_PWM, min(-mapped_slider + mapped_rot, 255));
-      digitalWrite(MOTOR_A_R, HIGH);
-      digitalWrite(MOTOR_A_L, LOW);
-      digitalWrite(MOTOR_B_R, HIGH);
-      digitalWrite(MOTOR_B_L, LOW);
+      
     }
+    else
+    {
+      digitalWrite(MOTOR_B_L, LOW);
+      digitalWrite(MOTOR_B_R, HIGH);
+    }
+
+    analogWrite(MOTOR_A_PWM,(int)abs(kl));
+    analogWrite(MOTOR_B_PWM,(int)abs(kr));
 
     // Odtwórz animację na przycisk
     if (payload.sw == 1 && animState == ANIM_IDLE) {
